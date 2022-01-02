@@ -1,3 +1,14 @@
 memory 256
+
+goto 1
 input raw
-add 5
+goto 2
+input raw
+loop
+goto 1
+add 1
+goto 2
+sub 1
+end loop
+goto 1
+output raw
