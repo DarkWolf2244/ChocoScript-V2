@@ -1,82 +1,106 @@
-# ChocoScript V2 Transpiler
-#! By DarkWolf
-
+import click
 import re
+import os
+
 tokens = (
-    'MEMORY_SET_TOKEN', 'POINTER_MANIPULATION_TOKEN', 'IOCMD', 'IOARG', 'NUMBER', 'MEMORY_ADDRESS'
+    "MEMORY_SET",
+    "INPUT",
+    "OUTPUT",
+    "RAW",
+    "ASCII",
+    "ADD",
+    "SUB",
+    "NUMBER"
 )
 
 tokenRegexes = {
-    'MEMORY_SET_TOKEN': r'memory',
-    'POINTER_MANIPULATION_TOKEN': r'goto',
-    'IOCMD': r'input|output',
-    'IOARG': r'raw|ascii',
-    'NUMBER': r'\d+',
-    'MEMORY_ADDRESS': r'\$\d+'
+    "MEMORY_SET": r"memory",
+    "INPUT": r"input",
+    "OUTPUT": r"output",
+    "RAW": r"raw",
+    "ASCII": r"ascii",
+    "ADD": r"add",
+    "SUB": r"sub",
+    "NUMBER": r"\d+"
 }
 
 nodes = (
-    'MEMORY_SET_NODE', 'POINTER_MANIPULATION_NODE', 'IONODE'
+    "SET_MEMORY",
+    "INPUT_ASCII",
+    "INPUT_RAW",
+    "OUTPUT_ASCII",
+    "OUTPUT_RAW",
+    "ADD",
+    "SUB",
 )
 
-nodeSyntaxes = {
-    'MEMORY_SET_NODE': 'MEMORY_SET_TOKEN NUMBER',
-    'POINTER_MANIPULATION_NODE': 'POINTER_MANIPULATION_TOKEN MEMORY_ADDRESS',
-    'IONODE': 'IOCMD IOARG'
-}
-
 nodeRegexes = {
-    'MEMORY_SET_NODE': r'(memory) (\d+)',
-    'POINTER_MANIPULATION_NODE': r'(goto) (\$\d+)',
-    'IONODE': r'(input|output) (raw|ascii)'
+    "SET_MEMORY": r"^memory (\d+)$",
+    "INPUT_ASCII": r"^input ascii$",
+    "INPUT_RAW": r"^input raw$",
+    "OUTPUT_ASCII": r"^output ascii$",
+    "OUTPUT_RAW": r"^output raw$",
+    "ADD": r"^add (\d+)$",
+    "SUB": r"^sub (\d+)$"
 }
 
-def parse(code):
-    for node, regex in nodeRegexes.items():
-        if re.match(regex, code):
-            # Return the matches in a list
-            return re.findall(regex, code)
+def transpileDictionary():
+    def memory(number):
+        return f'memory = [0 for _ in range({number})]'
+    
+    def input_raw(*args, **kwargs):
+        return 'memory[pointer] = int(input())'
+    
+    def input_ascii(*args, **kwargs):
+        return 'memory[pointer] = ord(input())'
+    
+    def output_raw(*args, **kwargs):
+        return 'print(memory[pointer])'
 
-def IONode_instruction(token):
-    if token[0] == 'input':
-        if token[1] == 'raw':
-            return f"memory[pointer] = int(input())"
-        elif token[1] == 'ascii':
-            return f"memory[pointer] = ord(input())"
-    elif token[0] == 'output':
-        if token[1] == 'raw':
-            return f"print(chr(memory[pointer]))"
-        elif token[1] == 'ascii':
-            return f"print(memory[pointer])"
+    def output_ascii(*args, **kwargs):
+        return 'print(chr(memory[pointer]))'
+    
+    def add(number, *args, **kwargs):
+        return f'memory[pointer] += {number}'
+    
+    def sub(number, *args, **kwargs):
+        return f'memory[pointer] -= {number}'
+    
+    return {
+        "SET_MEMORY": memory,
+        "INPUT_ASCII": input_ascii,
+        "INPUT_RAW": input_raw,
+        "OUTPUT_ASCII": output_ascii,
+        "OUTPUT_RAW": output_raw,
+        "ADD": add,
+        "SUB": sub
+    }
 
-instructions = {
-    "memory": lambda size: f"memory = [0 for _ in range({size})]",
-    "goto": lambda address: f"pointer = {address}",
-    "IONODE": IONode_instruction
-}
+def transpile(file: str, outputFile: str):
+    with open(file, "r") as f:
+        lines = f.readlines()
+        lines = [line.strip() for line in lines]
+    
+    # Remove empty lines
+    lines = [line for line in lines if line]
 
-# Run through every line in main.choco, remove the line endings and parse them
+    # Run through all nodeRegexes and append a tuple of (nodeName, matches_in_regex)
+    nodes = []
+    for node in nodeRegexes:
+        for line in lines:
+            matches = re.findall(nodeRegexes[node], line)
+            if matches:
+                nodes.append((node, matches))
 
-tokens = []
+    # If there is no file named [outputFile], create it
+    if not os.path.isfile(outputFile):
+        with open(outputFile, "w") as f:
+            f.write("")
+    
+    with open(outputFile, "w") as f:
+        f.write("pointer = 0\n")
+        for node in nodes:
+            f.write(f"{transpileDictionary()[node[0]](*node[1])}\n")
 
-with open('main.choco', 'r') as f:
-    lines = f.readlines()
-    for line in lines:
-        line = line.strip()
-        if line:
-            tokens.append(parse(line))
-
-toWrite = []
-for token in tokens:
-    if token[0][0] in ['input', 'output']:
-        toWrite.append(IONode_instruction(token[0]))
-    elif token[0][0] == 'memory':
-        toWrite.append(instructions['memory'](token[0][1]))
-    elif token[0][0] == 'goto':
-        toWrite.append(instructions['goto'](token[0][1]))
-
-with open('output.py', 'w') as f:
-    f.write("pointer = 0\n")
-    for line in toWrite:
-        f.write(line + '\n')
-
+if __name__ == "__main__":
+    print(transpile("main.choco", "output.py"))
