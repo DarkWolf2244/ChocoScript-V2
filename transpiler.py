@@ -6,8 +6,6 @@ from rich.console import Console
 from rich.style import Style
 import time
 
-console = Console()
-
 indentLevel = 0
 
 tokens = (
@@ -21,7 +19,9 @@ tokens = (
     "NUMBER",
     "START_LOOP",
     "END_LOOP",
-    "GOTO"
+    "GOTO",
+    "IF",
+    "END_IF"
 )
 
 tokenRegexes = {
@@ -56,7 +56,9 @@ nodeRegexes = {
     "SUB": r"^sub (\d+)$",
     "BEGIN_LOOP": r"^loop$",
     "END_LOOP": r"^end loop$",
-    "GOTO": r"^goto (\d+)$"
+    "GOTO": r"^goto (\d+)$",
+    "START_IF": r"^if (\d+)$",
+    "END_IF": r"^end if$"
 }
 
 def transpileDictionary():
@@ -95,6 +97,16 @@ def transpileDictionary():
     def goto(number, *args, **kwargs):
         return f'pointer = {number}'
 
+    def start_if(number, *args, **kwargs):
+        global indentLevel
+        indentLevel += 1
+        return f'if memory[pointer] == {number}:'
+
+    def end_if(*args, **kwargs):
+        global indentLevel
+        indentLevel -= 1
+        return ''
+
     return {
         "SET_MEMORY": memory,
         "INPUT_ASCII": input_ascii,
@@ -105,7 +117,9 @@ def transpileDictionary():
         "SUB": sub,
         "BEGIN_LOOP": begin_loop,
         "END_LOOP": end_loop,
-        "GOTO": goto
+        "GOTO": goto,
+        "START_IF": start_if,
+        "END_IF": end_if
     }
 
 def transpile(file: str, outputFile: str):
