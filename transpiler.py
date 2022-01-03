@@ -3,8 +3,6 @@ from click import Option, UsageError
 import re
 import os
 from rich import print
-from rich.console import Console
-from rich.style import Style
 import time
 
 indentLevel = 0
