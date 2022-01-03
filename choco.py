@@ -1,3 +1,6 @@
+# Choco V2 CLI
+# By DarkWolf
+
 import click
 from click import Option, UsageError
 import transpiler
