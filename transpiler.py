@@ -1,4 +1,5 @@
 import click
+from click import Option, UsageError
 import re
 import os
 from rich import print
@@ -21,7 +22,9 @@ tokens = (
     "END_LOOP",
     "GOTO",
     "IF",
-    "END_IF"
+    "END_IF",
+    "RIGHT",
+    "LEFT",
 )
 
 tokenRegexes = {
@@ -33,7 +36,7 @@ tokenRegexes = {
     "ADD": r"add",
     "SUB": r"sub",
     "NUMBER": r"\d+",
-    "GOTO": r"goto"
+    "GOTO": r"goto",
 }
 
 nodes = (
@@ -58,7 +61,9 @@ nodeRegexes = {
     "END_LOOP": r"^end loop$",
     "GOTO": r"^goto (\d+)$",
     "START_IF": r"^if (\d+)$",
-    "END_IF": r"^end if$"
+    "END_IF": r"^end if$",
+    "RIGHT": r"^right$",
+    "LEFT": r"^left$"
 }
 
 def transpileDictionary():
@@ -73,10 +78,10 @@ def transpileDictionary():
         return 'memory[pointer] = ord(input())'
     
     def output_raw(*args, **kwargs):
-        return 'print(memory[pointer])'
+        return 'print(memory[pointer], end="")'
 
     def output_ascii(*args, **kwargs):
-        return 'print(chr(memory[pointer]))'
+        return 'print(chr(memory[pointer]), end="")'
     
     def add(number, *args, **kwargs):
         return f'memory[pointer] += {number}'
@@ -107,6 +112,12 @@ def transpileDictionary():
         indentLevel -= 1
         return ''
 
+    def right(*args, **kwargs):
+        return 'pointer += 1'
+
+    def left(*args, **kwargs):
+        return 'pointer -= 1'
+
     return {
         "SET_MEMORY": memory,
         "INPUT_ASCII": input_ascii,
@@ -119,7 +130,9 @@ def transpileDictionary():
         "END_LOOP": end_loop,
         "GOTO": goto,
         "START_IF": start_if,
-        "END_IF": end_if
+        "END_IF": end_if,
+        "RIGHT": right,
+        "LEFT": left,
     }
 
 def transpile(file: str, outputFile: str):
@@ -148,6 +161,33 @@ def transpile(file: str, outputFile: str):
         for node in nodes:
             f.write(f"{'    ' * indentLevel}{transpileDictionary()[node[0]](*node[1])}\n")
 
+class MutuallyExclusiveOption(Option):
+    def __init__(self, *args, **kwargs):
+        self.mutually_exclusive = set(kwargs.pop('mutually_exclusive', []))
+        help = kwargs.get('help', '')
+        if self.mutually_exclusive:
+            ex_str = ', '.join(self.mutually_exclusive)
+            kwargs['help'] = help + (
+                ' NOTE: This argument is mutually exclusive with '
+                ' arguments: [' + ex_str + '].'
+            )
+        super(MutuallyExclusiveOption, self).__init__(*args, **kwargs)
+
+    def handle_parse_result(self, ctx, opts, args):
+        if self.mutually_exclusive.intersection(opts) and self.name in opts:
+            raise UsageError(
+                "Illegal usage: `{}` is mutually exclusive with "
+                "arguments `{}`.".format(
+                    self.name,
+                    ', '.join(self.mutually_exclusive)
+                )
+            )
+
+        return super(MutuallyExclusiveOption, self).handle_parse_result(
+            ctx,
+            opts,
+            args
+        )
 
 # Create a click command
 # The command takes in a required argument for the input file and an optional path for the output file, which is "output.py" by default
@@ -158,18 +198,18 @@ def transpile(file: str, outputFile: str):
 @click.option("--outputFile", "-o", default="output.py", type=click.Path())
 @click.option("--silent", "-s", is_flag=True)
 @click.option("--ctexe", "-c", is_flag=True)
-def main(inputfile, outputfile, silent, ctexe):
+@click.option("--run", '-r', is_flag=True, help="Run the output file after transpiling", cls=MutuallyExclusiveOption, mutually_exclusive=['rexe'])
+@click.option("--runexe", '-re', is_flag=True, help="Run the output file after transpiling", cls=MutuallyExclusiveOption, mutually_exclusive=['run'])
+def main(inputfile, outputfile, silent, ctexe, run, runexe):
     if not silent:
         print(f"[blue]ChocoScript V2 Transpiler[/blue]")
         time.sleep(1.4)
         print(f"[yellow]Transpiling [/yellow][blue]{inputfile}[/blue][yellow] to [/yellow][blue]{outputfile}[/blue][yellow]...[/yellow]")
         time.sleep(1.4)
-
     transpile(inputfile, outputfile)
     if not silent:
         time.sleep(1.4)
         print(f"[green]Transpilation complete![/green]")
-    
     if ctexe:
         if not silent:
             time.sleep(1.4)
@@ -178,7 +218,23 @@ def main(inputfile, outputfile, silent, ctexe):
         if not silent:
             time.sleep(1.4)
             print(f"[light green]Executable created![/light green]")
-        
+    
+    if run:
+        if not silent:
+            time.sleep(1.4)
+            print(f"[yellow]Running [/yellow][blue]{outputfile}[/blue][yellow]...[/yellow]")
+        os.system(f"{outputfile}")
+        if not silent:
+            time.sleep(1.4)
+            print(f"[light green]Done![/light green]")
+    elif runexe:
+        if not silent:
+            time.sleep(1.4)
+            print(f"[yellow]Running [/yellow][blue]{outputfile}[/blue][yellow]...[/yellow]")
+        os.system(f"build\\output\\{outputfile[:-3]}")
+        if not silent:
+            time.sleep(1.4)
+            print(f"[light green]Done![/light green]")
 
 if __name__ == "__main__":
     main()

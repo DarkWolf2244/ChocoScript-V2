@@ -1,32 +1,69 @@
 memory 256
 
-input raw
+add 62
+goto 1
+add 32
+goto 2
+add 13
+goto 3
+add 10
 
-if 1
+goto 5
+add 1
+
+loop
+    goto 0
+    output ascii
     goto 1
-    input raw
-    goto 2
-    input raw
-    loop
+    output ascii
+    
+    goto 6
+
+    input ascii
+
+    if 97
+        goto 7
+        input raw
+        goto 8
+        input raw
+
+        loop
+            sub 1
+            goto 7
+            add 1
+            goto 8
+        end loop
+
+        goto 7
+
+        output raw
+    end if
+
+    if 115
+        goto 7
+        input raw
+        goto 8
+        input raw
+
+        loop
+            sub 1
+            goto 7
+            sub 1
+            goto 8
+        end loop
+
+        goto 7
+
+        output raw
+    end if
+
+    if 101
+        goto 5
         sub 1
-        goto 1
-        add 1
-        goto 2
-    end loop
-    goto 1
-    output raw
-end if
-if 2
-    goto 1
-    input raw
-    goto 2
-    input raw
-    loop
-        sub 1
-        goto 1
-        sub 1
-        goto 2
-    end loop
-    goto 1
-    output raw
-end if
+    end if
+
+    goto 3
+    output ascii
+
+    goto 5
+end loop
